@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'log_service.dart';
 
 class ApiService {
   late Dio _dio;
@@ -21,9 +23,7 @@ class ApiService {
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
         if (isDevMode) {
-          print('--- API Request ---');
-          print('URL: ${options.uri}');
-          print('Data: ${options.data}');
+          LogService().addLog('API Req: ${options.method} ${options.uri}');
         }
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('token');
@@ -40,23 +40,13 @@ class ApiService {
       },
       onResponse: (response, handler) {
         if (isDevMode) {
-          print('--- API Response ---');
-          print('URL: ${response.requestOptions.uri}');
-          print('Status: ${response.statusCode}');
-          print('Data: ${response.data}');
-          print('--------------------');
+          LogService().addLog('API Res: ${response.statusCode} ${response.requestOptions.uri}');
         }
         return handler.next(response);
       },
       onError: (DioException e, handler) {
         if (isDevMode) {
-          print('--- API Error ---');
-          print('URL: ${e.requestOptions.uri}');
-          print('Error: ${e.message}');
-          if (e.response != null) {
-            print('Data: ${e.response?.data}');
-          }
-           print('-----------------');
+           LogService().addLog('API Err: ${e.message} ${e.requestOptions.uri}');
         }
         return handler.next(e);
       },
@@ -97,6 +87,21 @@ class ApiService {
       // Non-critical, eat error or rethrow?
       // User flow shouldn't break if merchant save fails, but nice to know.
     }
+  }
+
+  Future<Response> cloneBills(int year, int month) async {
+    return _dio.post('/bills/clone', data: {
+      'year': year,
+      'month': month,
+    });
+  }
+
+  Future<Response> updateProfile(Map<String, dynamic> data) async {
+    return _dio.put('/users/profile', data: data);
+  }
+
+  Future<Response> getProfile() async {
+    return _dio.get('/users/profile');
   }
 
   Future<String?> uploadFile(File file) async {

@@ -15,10 +15,10 @@ class BillProvider with ChangeNotifier {
       .toSet()
       .toList();
 
-  List<String> get uniqueReceivers => _bills
-      .map((b) => b.receiver)
-      .where((r) => r != null && r.isNotEmpty)
-      .map((r) => r!)
+  List<String> get uniquePayers => _bills
+      .map((b) => b.payer)
+      .where((p) => p != null && p.isNotEmpty)
+      .map((p) => p!)
       .toSet()
       .toList();
 
@@ -71,67 +71,18 @@ class BillProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Logic:
-      // 1. Iterate through _bills (which should be the current month's bills)
-      // 2. Modify date to next month.
-      // 3. Apply logic based on isNextMonthSame.
-      
-      int nextYear = currentYear;
-      int nextMonth = currentMonth + 1;
-      if (nextMonth > 12) {
-        nextMonth = 1;
-        nextYear++;
+      if (ApiService.isDevMode) {
+        print('====== [UserOp] Calling Backend Clone API for $currentYear-$currentMonth ======');
       }
-
-      for (var bill in _bills) {
-        DateTime oldDate = bill.date;
-        // Calculate new date: same day of next month.
-        // Be careful with days that don't exist (e.g., Jan 31 -> Feb 28/29)
-        // Dart's DateTime handles overflow, e.g. DateTime(2023, 2, 31) becomes March 3.
-        // The prompt says "2025-12-25" -> "2026-01-25".
-        // It does not specify edge cases, but standard behavior or clamped is usually desired.
-        // I will assume standard DateTime behavior or check if "same day" is strict.
-        // "Automatic jump to the same day of the next month".
-        
-        DateTime newDate = DateTime(nextYear, nextMonth, oldDate.day);
-        
-        // Handle overflow if needed? E.g. Jan 31 -> Feb 28?
-        // If DateTime(2023, 2, 31) -> March 3, that might effectively be next month.
-        // Let's stick to simple adding month logic for now unless complex logic needed.
-        // Actually, cleaner is: DateTime(year, month + 1, day).
-        
-        // Clone Logic:
-        // a. Valid for "isNextMonthSame == true":
-        //    Copy: date, payTarget, pendingAmount, receiver, pendingReceiveAmount, note, isNextMonthSame.
-        // b. Valid for "isNextMonthSame == false":
-        //    Copy: date, payTarget, receiver, pendingReceiveAmount, note, isNextMonthSame.
-        //    Excludes: pendingAmount (implicit set to null/0).
-        
-        Map<String, dynamic> newBillData = {
-          'date': newDate.toIso8601String(),
-          'payTarget': bill.payTarget,
-          'note': bill.note,
-          'isNextMonthSame': bill.isNextMonthSame,
-          'receiver': bill.receiver,
-          'pendingReceiveAmount': bill.pendingReceiveAmount, // Copied in both cases? Prompt says:
-                                                             // b: ... receiver, pendingReceiveAmount (待收款金额) ... copied.
-                                                             // Wait, prompt: "b... copy ... receiver, pendingReceiveAmount...".
-                                                             // Yes, receive amount is copied in both cases per prompt text.
-        };
-
-        if (bill.isNextMonthSame) {
-          newBillData['pendingAmount'] = bill.pendingAmount;
-        } else {
-           // pendingAmount is NOT copied. effectively null.
-           newBillData['pendingAmount'] = null;
-        }
-
-        // isPaid, actualPaidDate, actualReceiveAmount should be reset (defaults).
-        newBillData['isPaid'] = false;
-        newBillData['actualPaidDate'] = null;
-        newBillData['actualReceiveAmount'] = null;
-
-        await _apiService.addBill(newBillData);
+      final response = await _apiService.cloneBills(currentYear, currentMonth);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+         if (ApiService.isDevMode) {
+           print('====== [UserOp] Backend Clone Successful ======');
+         }
+      } else {
+         if (ApiService.isDevMode) {
+           print('====== [UserOp] Backend Clone Failed: ${response.statusCode} ======');
+         }
       }
     } catch (e) {
       print('Clone error: $e');

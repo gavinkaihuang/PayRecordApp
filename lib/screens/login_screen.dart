@@ -15,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _rememberMe = false;
+  bool _obscurePassword = true;
 
   Future<void> _login() async {
     setState(() => _isLoading = true);
@@ -45,8 +46,21 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password'),
-              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility, // Use standard Material visibility icons
+                    color: Colors.grey,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
+              ),
+              obscureText: _obscurePassword,
             ),
             const SizedBox(height: 16),
             SizedBox(

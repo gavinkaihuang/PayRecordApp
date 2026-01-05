@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models/bill.dart';
 import '../providers/bill_provider.dart';
 import '../services/api_service.dart';
+import '../services/log_service.dart';
 
 class BillFormScreen extends StatefulWidget {
   final Bill? bill;
@@ -22,7 +23,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
   
   late TextEditingController _payTargetController;
   late TextEditingController _pendingAmountController;
-  late TextEditingController _receiverController;
+  late TextEditingController _payerController;
   late TextEditingController _pendingReceiveAmountController;
   late TextEditingController _actualReceiveAmountController;
   late TextEditingController _noteController;
@@ -49,7 +50,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
     _date = bill?.date ?? widget.initialDate ?? DateTime.now();
     _payTargetController = TextEditingController(text: bill?.payTarget ?? '');
     _pendingAmountController = TextEditingController(text: bill?.pendingAmount?.toString() ?? '');
-    _receiverController = TextEditingController(text: bill?.receiver ?? '');
+    _payerController = TextEditingController(text: bill?.payer ?? '');
     _pendingReceiveAmountController = TextEditingController(text: bill?.pendingReceiveAmount?.toString() ?? '');
     _actualReceiveAmountController = TextEditingController(text: bill?.actualReceiveAmount?.toString() ?? '');
     _noteController = TextEditingController(text: bill?.note ?? '');
@@ -75,7 +76,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
 
   void _log(String message) {
     if (ApiService.isDevMode) {
-      print('====== [UserOp] $message ======');
+      LogService().addLog('UserOp: $message');
     }
   }
 
@@ -84,7 +85,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
     _log('Form closed');
     _payTargetController.dispose();
     _pendingAmountController.dispose();
-    _receiverController.dispose();
+    _payerController.dispose();
     _pendingReceiveAmountController.dispose();
     _actualReceiveAmountController.dispose();
     _noteController.dispose();
@@ -102,7 +103,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
   }
 
   bool _receiveInfoHasData() {
-    return _receiverController.text.isNotEmpty ||
+    return _payerController.text.isNotEmpty ||
            _pendingReceiveAmountController.text.isNotEmpty ||
            _actualReceiveAmountController.text.isNotEmpty ||
            _payerIcon != null;
@@ -120,7 +121,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
 
   void _clearReceiveInfo() {
     setState(() {
-      _receiverController.clear();
+      _payerController.clear();
       _pendingReceiveAmountController.clear();
       _actualReceiveAmountController.clear();
       _payerIcon = null;
@@ -269,7 +270,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
 
   Future<void> _save() async {
     bool hasPay = _payTargetController.text.isNotEmpty;
-    bool hasReceive = _receiverController.text.isNotEmpty;
+    bool hasReceive = _payerController.text.isNotEmpty;
     
     // Relaxed validation: at least one side should present or follow existing validation
     if (!hasPay && !hasReceive) {
@@ -292,7 +293,8 @@ class _BillFormScreenState extends State<BillFormScreen> {
       pendingAmount: double.tryParse(_pendingAmountController.text),
       isPaid: _isPaid,
       actualPaidDate: _actualPaidDate,
-      receiver: _receiverController.text.isEmpty ? null : _receiverController.text,
+      payer: _payerController.text.isEmpty ? null : _payerController.text,
+      receiver: null, // Receiver is implicit (User), or unused for now
       pendingReceiveAmount: double.tryParse(_pendingReceiveAmountController.text),
       actualReceiveAmount: double.tryParse(_actualReceiveAmountController.text),
       note: _noteController.text,
@@ -312,8 +314,8 @@ class _BillFormScreenState extends State<BillFormScreen> {
       await apiService.setMerchantIcon(_payTargetController.text, _payeeIcon!);
     }
     
-    if (_payerIcon != null && _receiverController.text.isNotEmpty) {
-      await apiService.setMerchantIcon(_receiverController.text, _payerIcon!);
+    if (_payerIcon != null && _payerController.text.isNotEmpty) {
+      await apiService.setMerchantIcon(_payerController.text, _payerIcon!);
     }
 
     bool success;
@@ -532,9 +534,9 @@ class _BillFormScreenState extends State<BillFormScreen> {
                       const Text('Receivable', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
                       const SizedBox(height: 16),
                       _buildAutocompleteField(
-                        controller: _receiverController,
-                        label: 'Receiver',
-                        options: provider.uniqueReceivers,
+                        controller: _payerController,
+                        label: 'Payer',
+                        options: provider.uniquePayers,
                         onIconPressed: () => _pickAndUploadIcon(false),
                         onFocusAction: () => _checkConflict(isPay: false),
                         currentIconUrl: _payerIcon,

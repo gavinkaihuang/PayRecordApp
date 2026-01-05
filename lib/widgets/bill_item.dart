@@ -23,6 +23,15 @@ class BillItem extends StatelessWidget {
     final currencyFormat = NumberFormat.simpleCurrency(decimalDigits: 2, name: '¥ '); 
     final dateFormat = DateFormat('MM-dd');
 
+    // Determine display properties based on Pay vs Receive
+    String displayName = bill.payTarget;
+    String? displayIcon = bill.payeeIcon;
+    
+    if (bill.payTarget.isEmpty && bill.payer != null && bill.payer!.isNotEmpty) {
+      displayName = bill.payer!;
+      displayIcon = bill.payerIcon;
+    }
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
@@ -53,13 +62,13 @@ class BillItem extends StatelessWidget {
                 SizedBox(
                   width: 50,
                   height: 50,
-                  child: bill.payeeIcon != null && bill.payeeIcon!.isNotEmpty
+                  child: displayIcon != null && displayIcon.isNotEmpty
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: Image.network(
-                            bill.payeeIcon!.startsWith('http') 
-                                ? bill.payeeIcon! 
-                                : '${ApiService.serverUrl}/${bill.payeeIcon!.startsWith('/') ? bill.payeeIcon!.substring(1) : bill.payeeIcon!}',
+                            displayIcon.startsWith('http') 
+                                ? displayIcon 
+                                : '${ApiService.serverUrl}/${displayIcon.startsWith('/') ? displayIcon.substring(1) : displayIcon}',
                             width: 50,
                             height: 50,
                             fit: BoxFit.cover,
@@ -93,7 +102,7 @@ class BillItem extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        bill.payTarget,
+                        displayName,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

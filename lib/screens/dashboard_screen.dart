@@ -9,7 +9,10 @@ import '../providers/bill_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/bill.dart';
 import '../widgets/bill_item.dart';
+import '../services/api_service.dart';
 import 'bill_form_screen.dart';
+import 'settings_screen.dart';
+import '../services/log_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -59,16 +62,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _cloneToNextMonth() async {
+    if (ApiService.isDevMode) {
+      LogService().addLog('UserOp: Clicked Clone to Next Month');
+    }
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Clone to Next Month'),
         content: Text(
-          'This will clone bills from ${DateFormat('MMMM').format(_focusedDay)} to next month. Continue?'
+          'Are you sure you want to clone the monthly plan from ${DateFormat('MMMM').format(_focusedDay)} to the next period?'
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Clone')),
+          TextButton(
+            onPressed: () {
+               if (ApiService.isDevMode) LogService().addLog('UserOp: Clone Cancelled');
+               Navigator.pop(ctx, false);
+            }, 
+            child: const Text('Cancel')
+          ),
+          TextButton(
+            onPressed: () {
+               if (ApiService.isDevMode) LogService().addLog('UserOp: Clone Confirmed');
+               Navigator.pop(ctx, true);
+            }, 
+            child: const Text('Clone')
+          ),
         ],
       ),
     );
@@ -76,6 +95,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (confirm == true) {
       if (!mounted) return;
       final billProvider = Provider.of<BillProvider>(context, listen: false);
+      
+      if (ApiService.isDevMode) LogService().addLog('UserOp: Submitting Clone Request...');
       await billProvider.cloneBillstToNextMonth(_focusedDay.year, _focusedDay.month);
       
       // Navigate to next month to see results
@@ -89,6 +110,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cloned successfully!')),
       );
+      if (ApiService.isDevMode) LogService().addLog('UserOp: Clone Success');
     }
   }
 
@@ -163,7 +185,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black54),
           tooltip: 'Exit App',
-          onPressed: _onExitApp,
+          onPressed: () {
+            LogService().addLog('UserOp: Exit App Clicked');
+            _onExitApp();
+          },
         ),
         title: const Text(
           'PayRecord',
@@ -436,7 +461,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         height: 60,
         width: 60,
         decoration: BoxDecoration(
-          color: const Color(0xFF5B8CFF), // Blue FAB
+          color: const Color(0xFF5B8CFF),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -447,15 +472,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ]
         ),
         child: IconButton(
-          icon: const Icon(Icons.add, color: Colors.white, size: 30),
+          icon: const Icon(Icons.menu, color: Colors.white, size: 30),
           onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                // Pass selected date as default for new bill
-                builder: (context) => BillFormScreen(initialDate: _selectedDay ?? DateTime.now()),
+            LogService().addLog('UserOp: Opened Main Menu');
+            showModalBottomSheet(
+              context: context, 
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20))
               ),
-            ).then((_) => _fetchBills());
+              builder: (ctx) => SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.add, color: Colors.blue),
+                      title: const Text('Add New Bill'),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => BillFormScreen(initialDate: _selectedDay ?? DateTime.now()),
+                          ),
+                        ).then((_) => _fetchBills());
+                      },
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.settings, color: Colors.grey),
+                      title: const Text('Settings'),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
           },
         ),
       ),

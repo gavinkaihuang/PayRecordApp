@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../models/user.dart';
+import '../services/log_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -34,6 +35,9 @@ class AuthProvider with ChangeNotifier {
         final token = data['token'] ?? data['access_token']; 
         
         if (token != null) {
+          if (ApiService.isDevMode) {
+             print('====== [UserOp] Login Success. Token: $token ======');
+          }
           // Always save token for persistent login as requested
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('token', token);
@@ -52,6 +56,9 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
+    if (ApiService.isDevMode) {
+      LogService().addLog('UserOp: Logging out, clearing token...');
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     await prefs.remove('username');
