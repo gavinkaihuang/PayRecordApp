@@ -1,9 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 
 class ApiService {
   late Dio _dio;
-  final String baseUrl = 'http://192.168.0.101:3000/api';
+  static const String serverUrl = 'http://192.168.0.101:3000';
+  final String baseUrl = '$serverUrl/api';
   static bool isDevMode = true;
 
   ApiService() {
@@ -81,5 +83,39 @@ class ApiService {
 
   Future<Response> updateBill(String id, Map<String, dynamic> billData) async {
     return _dio.put('/bills/$id', data: billData);
+  }
+
+  Future<void> setMerchantIcon(String name, String iconUrl) async {
+    try {
+      if (isDevMode) print('Setting merchant icon for $name: $iconUrl');
+      await _dio.post('/merchants', data: {
+        'name': name,
+        'icon': iconUrl,
+      });
+    } catch (e) {
+      if (isDevMode) print('Failed to set merchant icon: $e');
+      // Non-critical, eat error or rethrow?
+      // User flow shouldn't break if merchant save fails, but nice to know.
+    }
+  }
+
+  Future<String?> uploadFile(File file) async {
+    String fileName = file.path.split('/').last;
+    FormData formData = FormData.fromMap({
+      "file": await MultipartFile.fromFile(file.path, filename: fileName),
+    });
+    try {
+      final response = await _dio.post('/upload', data: formData);
+      // Assuming response.data['url'] or nested structure. 
+      // Adjust based on actual backend. Commonly { url: "path" }
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data['url']; 
+      }
+    } catch (e) {
+      if (isDevMode) {
+        print('Upload error: $e');
+      }
+    }
+    return null;
   }
 }

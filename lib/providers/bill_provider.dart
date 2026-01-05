@@ -10,6 +10,18 @@ class BillProvider with ChangeNotifier {
   List<Bill> get bills => _bills;
   bool get isLoading => _isLoading;
 
+  List<String> get uniquePayees => _bills
+      .map((b) => b.payTarget)
+      .toSet()
+      .toList();
+
+  List<String> get uniqueReceivers => _bills
+      .map((b) => b.receiver)
+      .where((r) => r != null && r.isNotEmpty)
+      .map((r) => r!)
+      .toSet()
+      .toList();
+
   Future<void> fetchBills(int year, int month) async {
     _isLoading = true;
     notifyListeners();

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../providers/bill_provider.dart';
 import '../providers/auth_provider.dart';
+import '../models/bill.dart';
 import '../widgets/bill_item.dart';
 import 'bill_form_screen.dart';
 
@@ -18,6 +21,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
+  CalendarFormat _calendarFormat = CalendarFormat.week;
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener = ItemPositionsListener.create();
 
@@ -25,14 +29,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
-    _fetchBills();
+    // Delay fetch to avoid setState during build
+    Future.microtask(() => _fetchBills());
   }
 
-  void _fetchBills() {
-    Future.microtask(() =>
-      Provider.of<BillProvider>(context, listen: false)
-          .fetchBills(_focusedDay.year, _focusedDay.month)
-    );
+  Future<void> _fetchBills() async {
+    await Provider.of<BillProvider>(context, listen: false)
+          .fetchBills(_focusedDay.year, _focusedDay.month);
   }
 
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
@@ -89,6 +92,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _onQuickPay(Bill bill) async {
+    final billProvider = Provider.of<BillProvider>(context, listen: false);
+    
+    // Create updated bill object
+    final updatedBill = Bill(
+      id: bill.id,
+      date: bill.date,
+      payTarget: bill.payTarget,
+      pendingAmount: bill.pendingAmount,
+      isPaid: true,
+      actualPaidDate: DateTime.now(), // Set to now
+      payer: bill.payer,
+      receiver: bill.receiver,
+      pendingReceiveAmount: bill.pendingReceiveAmount,
+      actualReceiveAmount: bill.actualReceiveAmount,
+      note: bill.note,
+      isNextMonthSame: bill.isNextMonthSame,
+    );
+
+    final success = await billProvider.updateBill(bill.id!, updatedBill);
+    if (success) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Marked as paid!')),
+      );
+      _fetchBills(); // Refresh list to update UI
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update bill')),
+      );
+    }
+  }
+
+  Future<void> _onExitApp() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Exit App'),
+        content: const Text('Are you sure you want to exit the application?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Exit'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true) {
+      exit(0);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final billProvider = Provider.of<BillProvider>(context);
@@ -101,39 +162,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black54),
-          tooltip: 'Logout',
-          onPressed: () {
-            Provider.of<AuthProvider>(context, listen: false).logout();
-          },
+          tooltip: 'Exit App',
+          onPressed: _onExitApp,
         ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.chevron_left, color: Colors.black54),
-              onPressed: () {
-                 setState(() {
-                  _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1);
-                  _fetchBills();
-                });
-              },
-            ),
-            Text(
-              DateFormat('MMMM yyyy').format(_focusedDay), 
-              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)
-            ),
-            IconButton(
-              icon: const Icon(Icons.chevron_right, color: Colors.black54),
-              onPressed: () {
-                setState(() {
-                  _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1);
-                  _fetchBills();
-                });
-              },
-            ),
-          ],
+        title: const Text(
+          'PayRecord',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_view_week, color: Colors.black54),
+            tooltip: 'Toggle View',
+            onPressed: () {
+              setState(() {
+                _calendarFormat = _calendarFormat == CalendarFormat.month
+                    ? CalendarFormat.week
+                    : CalendarFormat.month;
+              });
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.copy, color: Colors.black54),
             tooltip: 'Clone to Next Month',
@@ -156,7 +203,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         child: Column(
           children: [
-            const SizedBox(height: 100), // Spacing for AppBar
+            SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight), 
+            
+            // Month Switcher moved here
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left, color: Colors.black54),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    onPressed: () {
+                       setState(() {
+                        _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1);
+                        _fetchBills();
+                      });
+                    },
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _calendarFormat = _calendarFormat == CalendarFormat.month
+                            ? CalendarFormat.week
+                            : CalendarFormat.month;
+                      });
+                    },
+                    child: Text(
+                      DateFormat('MMM yyyy').format(_focusedDay), 
+                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right, color: Colors.black54),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    onPressed: () {
+                      setState(() {
+                        _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1);
+                        _fetchBills();
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+
             TableCalendar(
               firstDay: DateTime.utc(2020, 1, 1),
               lastDay: DateTime.utc(2030, 12, 31),
@@ -167,7 +258,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _focusedDay = focusedDay;
                 _fetchBills();
               },
-              calendarFormat: CalendarFormat.month,
+              calendarFormat: _calendarFormat,
+              onFormatChanged: (format) {
+                setState(() {
+                  _calendarFormat = format;
+                });
+              },
               headerVisible: false, // We use custom AppBar title
               calendarStyle: const CalendarStyle(
                 outsideDaysVisible: false,
@@ -190,19 +286,84 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 weekendStyle: TextStyle(color: Colors.black54),
               ),
               calendarBuilders: CalendarBuilders(
+                // Custom background for payment status
+                defaultBuilder: (context, date, focusedDay) {
+                  final bills = billProvider.bills.where((b) => isSameDay(b.date, date)).toList();
+                  if (bills.isEmpty) return null;
+
+                  Color? bgColor;
+                  if (bills.every((b) => b.isPaid)) {
+                    bgColor = const Color(0xFFE8F5E9); // Green tint for all paid
+                  } else if (bills.every((b) => !b.isPaid)) {
+                    bgColor = const Color(0xFFFFEBEE); // Red tint for all unpaid
+                  } else {
+                    bgColor = const Color(0xFFFFFDE7); // Yellow tint for mixed
+                  }
+
+                  return Container(
+                    margin: const EdgeInsets.all(4.0),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${date.day}',
+                      style: const TextStyle(color: Colors.black87),
+                    ),
+                  );
+                },
+                
+                // Keep selected day distinctive but maybe hint at status? 
+                // For now, standard selection blue circle as per previous design compliance
+                selectedBuilder: (context, date, focusedDay) {
+                  return Container(
+                    margin: const EdgeInsets.all(4.0),
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFD6E4FF), 
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${date.day}',
+                      style: const TextStyle(color: Color(0xFF2B5CFF), fontWeight: FontWeight.bold),
+                    ),
+                  );
+                },
+
+                // Marker: Show number if bills exist
                 markerBuilder: (context, date, events) {
-                  final count = billProvider.bills.where((b) => isSameDay(b.date, date)).length;
-                  if (count > 0) {
+                  final bills = billProvider.bills.where((b) => isSameDay(b.date, date)).toList();
+                  if (bills.isNotEmpty) {
+                    final isAllPaid = bills.every((b) => b.isPaid);
+                    final isAllUnpaid = bills.every((b) => !b.isPaid);
+                    
+                    // Use a more legible marker count
                     return Positioned(
-                      right: 6,
-                      bottom: 4,
+                      right: 1,
+                      bottom: 1,
                       child: Container(
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF2B5CFF), // Blue dot
+                        decoration: BoxDecoration(
+                          // Marker color logic: 
+                          // If background is colored, maybe use contrasting marker?
+                          // Let's stick to Blue for standard, or match status?
+                          // User requested "change dot to number". 
+                          // I'll use a small badge.
+                          color: isAllPaid ? Colors.green : (isAllUnpaid ? Colors.red : Colors.orange),
                           shape: BoxShape.circle,
                         ),
-                        width: 6.0,
-                        height: 6.0,
+                        width: 14.0,
+                        height: 14.0,
+                        child: Center(
+                          child: Text(
+                            '${bills.length}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9.0,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ),
                     );
                   }
@@ -246,12 +407,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             itemPositionsListener: _itemPositionsListener,
                             itemCount: billProvider.bills.length,
                             padding: const EdgeInsets.only(top: 16, bottom: 80), // Padding for FAB prevention
-                            separatorBuilder: (context, index) => const Divider(height: 1, thickness: 0.5, color: Color(0xFFEEEEEE)),
+                            // separatorBuilder: (context, index) => const Divider(height: 1, thickness: 0.5, color: Color(0xFFEEEEEE)), // Removed for card style
+                            separatorBuilder: (context, index) => const SizedBox(height: 0),
                             itemBuilder: (context, index) {
                               final bill = billProvider.bills[index];
                               return BillItem(
                                 bill: bill,
                                 isSelected: isSameDay(bill.date, _selectedDay),
+                                onPayClick: () => _onQuickPay(bill),
                                 onTap: () {
                                   Navigator.push(
                                     context,

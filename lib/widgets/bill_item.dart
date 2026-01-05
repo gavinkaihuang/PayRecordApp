@@ -1,90 +1,169 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/bill.dart';
+import '../services/api_service.dart';
 
 class BillItem extends StatelessWidget {
   final Bill bill;
   final VoidCallback onTap;
+  final VoidCallback? onPayClick;
   final bool isSelected;
 
   const BillItem({
     super.key, 
     required this.bill, 
     required this.onTap,
+    this.onPayClick,
     this.isSelected = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.simpleCurrency(decimalDigits: 2);
-    final dateFormat = DateFormat('yyyy-MM-dd');
+    // Formatters
+    final currencyFormat = NumberFormat.simpleCurrency(decimalDigits: 2, name: '¥ '); 
+    final dateFormat = DateFormat('MM-dd');
 
     return Container(
-      color: isSelected ? const Color(0xFFF0F5FF) : Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  bill.payTarget, 
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold, 
-                    fontSize: 18, 
-                    color: Colors.black87
-                  )
-                ),
-                // Optional: Arrow icon can go here or be removed as per design
-                // Icon(Icons.chevron_right, color: Colors.grey[400], size: 20), 
-              ],
-            ),
-            const SizedBox(height: 8),
-            _buildInfoRow('Due Date', dateFormat.format(bill.date)),
-            _buildInfoRow('Payer', bill.payer != null && bill.payer!.isNotEmpty ? bill.payer! : "Unknown"),
-            _buildInfoRow('Amount', bill.pendingAmount != null ? currencyFormat.format(bill.pendingAmount) : '-'),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Text('Is Paid: ', style: TextStyle(color: Colors.grey, fontSize: 14)),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.circle,
-                  color: bill.isPaid ? const Color(0xFF4CAF50) : const Color(0xFFEF5350),
-                  size: 14,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  bill.isPaid ? 'Yes' : 'No', 
-                  style: TextStyle(
-                    color: bill.isPaid ? const Color(0xFF4CAF50) : const Color(0xFFEF5350), 
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  )
-                ),
-              ],
-            ),
-             if (bill.isPaid) ...[
-                const SizedBox(height: 4),
-                _buildInfoRow('Paid Date', bill.actualPaidDate != null ? dateFormat.format(bill.actualPaidDate!) : '-'),
-             ]
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4.0),
-      child: Row(
-        children: [
-          Text('$label: ', style: const TextStyle(color: Colors.grey, fontSize: 14)),
-          Text(value, style: const TextStyle(color: Colors.black87, fontSize: 14)),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            offset: const Offset(0, 4),
+            blurRadius: 10,
+          ),
         ],
+        border: isSelected 
+          ? Border.all(color: const Color(0xFF2B5CFF), width: 1.5) 
+          : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Left Icon
+                SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: bill.payeeIcon != null && bill.payeeIcon!.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            bill.payeeIcon!.startsWith('http') 
+                                ? bill.payeeIcon! 
+                                : '${ApiService.serverUrl}/${bill.payeeIcon!.startsWith('/') ? bill.payeeIcon!.substring(1) : bill.payeeIcon!}',
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.broken_image, color: Colors.grey, size: 24)
+                            ),
+                          ),
+                        )
+                      : Container(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF4FACFE), Color(0xFF00F2FE)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.attach_money, color: Colors.white, size: 30),
+                        ),
+                ),
+                const SizedBox(width: 16),
+                
+                // Middle Section (Target & Amount)
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        bill.payTarget,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        bill.pendingAmount != null ? currencyFormat.format(bill.pendingAmount) : '-',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Right Section (Dates & Button)
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '日期: ${dateFormat.format(bill.date)}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey[500],
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '实际支付: ${bill.actualPaidDate != null ? dateFormat.format(bill.actualPaidDate!) : 'N/A'}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: bill.isPaid ? const Color(0xFF4CAF50) : const Color(0xFFFF6B6B),
+                        ),
+                         textAlign: TextAlign.right,
+                      ),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: bill.isPaid ? null : onPayClick,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: bill.isPaid ? Colors.grey[300] : const Color(0xFF2B5CFF),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            bill.isPaid ? '已支付' : '支付',
+                            style: TextStyle(
+                              color: bill.isPaid ? Colors.black54 : Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

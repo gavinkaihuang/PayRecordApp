@@ -10,7 +10,9 @@ class Bill {
   final double? pendingReceiveAmount;
   final double? actualReceiveAmount;
   final String? note; // Maps to 'notes'
-  final bool isNextMonthSame; // Maps to 'isRecurring' ? No logs say 'isRecurring'
+  final bool isNextMonthSame; // Maps to 'isRecurring'
+  final String? payeeIcon;
+  final String? payerIcon;
 
   Bill({
     this.id,
@@ -25,6 +27,8 @@ class Bill {
     this.actualReceiveAmount,
     this.note,
     this.isNextMonthSame = false,
+    this.payeeIcon,
+    this.payerIcon,
   });
 
   factory Bill.fromJson(Map<String, dynamic> json) {
@@ -41,6 +45,8 @@ class Bill {
       actualReceiveAmount: json['actualReceiveAmount']?.toDouble(),
       note: json['notes'] ?? json['note'],
       isNextMonthSame: json['isRecurring'] ?? json['isNextMonthSame'] ?? false,
+      payeeIcon: json['payeeIcon'],
+      payerIcon: json['payerIcon'],
     );
   }
 
@@ -58,6 +64,8 @@ class Bill {
       'actualReceiveAmount': actualReceiveAmount,
       'notes': note,
       'isRecurring': isNextMonthSame,
+      'payeeIcon': payeeIcon,
+      'payerIcon': payerIcon,
     };
   }
 }
