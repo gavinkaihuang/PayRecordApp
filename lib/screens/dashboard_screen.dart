@@ -206,11 +206,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               });
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.copy, color: Colors.black54),
-            tooltip: 'Clone to Next Month',
-            onPressed: billProvider.bills.isEmpty ? null : _cloneToNextMonth,
-          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -498,6 +493,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       },
                     ),
                     const Divider(),
+                    if (billProvider.bills.isNotEmpty)
+                      ListTile(
+                         leading: const Icon(Icons.copy, color: Colors.indigo),
+                         title: const Text('Clone to Next Month'),
+                         onTap: () {
+                           Navigator.pop(ctx);
+                           _cloneToNextMonth();
+                         },
+                      ),
+                    if (billProvider.bills.isNotEmpty) const Divider(),
                     ListTile(
                       leading: const Icon(Icons.settings, color: Colors.grey),
                       title: const Text('Settings'),

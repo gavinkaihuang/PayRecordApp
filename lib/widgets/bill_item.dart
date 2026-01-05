@@ -24,14 +24,19 @@ class BillItem extends StatelessWidget {
     final dateFormat = DateFormat('MM-dd');
 
     // Determine display properties based on Pay vs Receive
+    bool isIncome = false;
     String displayName = bill.payTarget;
     String? displayIcon = bill.payeeIcon;
+    double? displayAmount = bill.pendingAmount;
     
+    // Check if it is an income (Payer exists, PayTarget empty)
     if (bill.payTarget.isEmpty && bill.payer != null && bill.payer!.isNotEmpty) {
+      isIncome = true;
       displayName = bill.payer!;
       displayIcon = bill.payerIcon;
+      displayAmount = bill.pendingReceiveAmount;
     }
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
@@ -83,14 +88,20 @@ class BillItem extends StatelessWidget {
                         )
                       : Container(
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF4FACFE), Color(0xFF00F2FE)],
+                            gradient: LinearGradient(
+                              colors: isIncome 
+                                  ? [const Color(0xFF66BB6A), const Color(0xFF43A047)] // Green for Income
+                                  : [const Color(0xFF4FACFE), const Color(0xFF00F2FE)], // Blue for Expense
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.attach_money, color: Colors.white, size: 30),
+                          child: Icon(
+                            isIncome ? Icons.input : Icons.attach_money, // Different icon for income default
+                            color: Colors.white, 
+                            size: 30
+                          ),
                         ),
                 ),
                 const SizedBox(width: 16),
@@ -113,10 +124,13 @@ class BillItem extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        bill.pendingAmount != null ? currencyFormat.format(bill.pendingAmount) : '-',
+                        displayAmount != null 
+                            ? '${isIncome ? '+' : '-'} ${currencyFormat.format(displayAmount)}' 
+                            : '-',
                         style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
+                          fontSize: 15, // Slightly larger
+                          fontWeight: FontWeight.w500,
+                          color: isIncome ? Colors.green[700] : Colors.red[700], // Color coding
                         ),
                       ),
                     ],
@@ -140,7 +154,7 @@ class BillItem extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '实际支付: ${bill.actualPaidDate != null ? dateFormat.format(bill.actualPaidDate!) : 'N/A'}',
+                        '${isIncome ? "实际到账" : "实际支付"}: ${bill.actualPaidDate != null ? dateFormat.format(bill.actualPaidDate!) : 'N/A'}',
                         style: TextStyle(
                           fontSize: 10,
                           color: bill.isPaid ? const Color(0xFF4CAF50) : const Color(0xFFFF6B6B),
@@ -153,14 +167,18 @@ class BillItem extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                           decoration: BoxDecoration(
-                            color: bill.isPaid ? Colors.grey[300] : const Color(0xFF2B5CFF),
+                            color: bill.isPaid 
+                                ? Colors.grey[300] 
+                                : (isIncome ? Colors.green : const Color(0xFF2B5CFF)),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            bill.isPaid ? '已支付' : '支付',
+                            bill.isPaid 
+                                ? (isIncome ? '已到账' : '已支付') 
+                                : (isIncome ? '确认到账' : '支付'),
                             style: TextStyle(
                               color: bill.isPaid ? Colors.black54 : Colors.white,
-                              fontSize: 12,
+                              fontSize: 10, // Slightly smaller text to fit
                               fontWeight: FontWeight.bold,
                             ),
                           ),
