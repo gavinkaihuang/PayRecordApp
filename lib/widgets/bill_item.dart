@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/bill.dart';
 import '../services/api_service.dart';
 
@@ -70,14 +71,18 @@ class BillItem extends StatelessWidget {
                   child: displayIcon != null && displayIcon.isNotEmpty
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            displayIcon.startsWith('http') 
+                          child: CachedNetworkImage(
+                            imageUrl: displayIcon.startsWith('http') 
                                 ? displayIcon 
                                 : '${ApiService.serverUrl}/${displayIcon.startsWith('/') ? displayIcon.substring(1) : displayIcon}',
                             width: 50,
                             height: 50,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
+                            placeholder: (context, url) => Container(
+                              color: Colors.grey[200],
+                              child: const Center(child: Icon(Icons.image, color: Colors.grey, size: 24)),
+                            ),
+                            errorWidget: (context, url, error) => Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey[200],
                                 borderRadius: BorderRadius.circular(12),
@@ -175,7 +180,7 @@ class BillItem extends StatelessWidget {
                           child: Text(
                             bill.isPaid 
                                 ? (isIncome ? '已到账' : '已支付') 
-                                : (isIncome ? '确认到账' : '支付'),
+                                : (isIncome ? '接收' : '支付'),
                             style: TextStyle(
                               color: bill.isPaid ? Colors.black54 : Colors.white,
                               fontSize: 10, // Slightly smaller text to fit

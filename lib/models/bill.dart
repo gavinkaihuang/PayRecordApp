@@ -34,11 +34,11 @@ class Bill {
   factory Bill.fromJson(Map<String, dynamic> json) {
     return Bill(
       id: json['_id'] ?? json['id'],
-      date: DateTime.parse(json['date']),
+      date: DateTime.parse(json['date']).toLocal(),
       payTarget: json['payee'] ?? json['payTarget'] ?? '',
       pendingAmount: (json['payAmount'] ?? json['pendingAmount'])?.toDouble(),
       isPaid: json['isPaid'] ?? false,
-      actualPaidDate: json['paidDate'] != null ? DateTime.parse(json['paidDate']) : (json['actualPaidDate'] != null ? DateTime.parse(json['actualPaidDate']) : null),
+      actualPaidDate: json['paidDate'] != null ? DateTime.parse(json['paidDate']).toLocal() : (json['actualPaidDate'] != null ? DateTime.parse(json['actualPaidDate']).toLocal() : null),
       payer: json['payer'],
       receiver: json['receiver'],
       pendingReceiveAmount: (json['receiveAmount'] ?? json['pendingReceiveAmount'])?.toDouble(),

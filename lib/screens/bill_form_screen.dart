@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/bill.dart';
 import '../providers/bill_provider.dart';
 import '../services/api_service.dart';
@@ -39,6 +40,8 @@ class _BillFormScreenState extends State<BillFormScreen> {
   bool _isNextMonthSame = false;
   String? _payeeIcon;
   String? _payerIcon;
+  
+  bool _isIncomeMode = false;
 
   bool _isLoading = false;
   final ImagePicker _picker = ImagePicker();
@@ -61,15 +64,16 @@ class _BillFormScreenState extends State<BillFormScreen> {
     _payeeIcon = bill?.payeeIcon;
     _payerIcon = bill?.payerIcon;
 
-    _pendingAmountFocus.addListener(() {
-      if (_pendingAmountFocus.hasFocus) _checkConflict(isPay: true);
-    });
-    _pendingReceiveAmountFocus.addListener(() {
-      if (_pendingReceiveAmountFocus.hasFocus) _checkConflict(isPay: false);
-    });
-    _actualReceiveAmountFocus.addListener(() {
-      if (_actualReceiveAmountFocus.hasFocus) _checkConflict(isPay: false);
-    });
+    // Determine initial mode based on existing data
+    if (bill != null && (bill.payer != null || bill.pendingReceiveAmount != null)) {
+       _isIncomeMode = true;
+    }
+    
+    // We can effectively remove the listener if we rely on explicit mode, 
+    // but keeping it doesn't hurt, though we rely on _isIncomeMode for UI labels now.
+    // _payerController.addListener(() {
+    //   if (mounted) setState(() {});
+    // });
     
     _log('Opened ${widget.bill == null ? "Add" : "Edit"} Bill Form');
   }
@@ -128,74 +132,10 @@ class _BillFormScreenState extends State<BillFormScreen> {
     });
   }
 
-  Future<void> _checkConflict({required bool isPay}) async {
-    if (isPay && _receiveInfoHasData()) {
-      _log('Conflict detected: Entering Payment while Receivable exists');
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (!mounted) return;
-      
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Conflict Detected'),
-          content: const Text('You have entered Receivable data. Do you want to clear it to enter Payment data?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                _log('User chose: Keep Both (Payment & Receivable)');
-                Navigator.pop(ctx, false);
-              },
-              child: const Text('Keep Both'),
-            ),
-            TextButton(
-              onPressed: () {
-                _log('User chose: Clear Receivable');
-                Navigator.pop(ctx, true);
-              },
-              child: const Text('Clear Receivable', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        ),
-      );
-      if (confirm == true) _clearReceiveInfo();
-    } 
-    
-    if (!isPay && _payInfoHasData()) {
-       _log('Conflict detected: Entering Receivable while Payment exists');
-       await Future.delayed(const Duration(milliseconds: 100));
-       if (!mounted) return;
 
-       final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Conflict Detected'),
-          content: const Text('You have entered Payment data. Do you want to clear it to enter Receivable data?'),
-          actions: [
-            TextButton(
-               onPressed: () {
-                _log('User chose: Keep Both (Payment & Receivable)');
-                Navigator.pop(ctx, false);
-              },
-              child: const Text('Keep Both'),
-            ),
-            TextButton(
-              onPressed: () {
-                _log('User chose: Clear Payment');
-                Navigator.pop(ctx, true);
-              },
-              child: const Text('Clear Payment', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        ),
-      );
-      if (confirm == true) _clearPayInfo();
-    }
-  }
 
   Future<void> _pickDate(BuildContext context, {bool isActualPaid = false}) async {
-    if (isActualPaid) {
-      _checkConflict(isPay: true);
-    }
+
     
     final initial = isActualPaid 
         ? (_actualPaidDate ?? DateTime.now())
@@ -221,7 +161,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
   }
 
   Future<void> _pickAndUploadIcon(bool isPayee) async {
-    await _checkConflict(isPay: isPayee);
+
     
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
@@ -276,6 +216,21 @@ class _BillFormScreenState extends State<BillFormScreen> {
     if (!hasPay && !hasReceive) {
         // If neither is present, and we have default validators, let it fail there or show snackbar
         _log('Save attempted with empty Pay and Receive fields');
+    }
+
+    if (hasPay && hasReceive) {
+        _log('Save conflict: Both Pay and Receive data present');
+        await showDialog(
+          context: context, 
+          builder: (ctx) => AlertDialog(
+            title: const Text('Data Conflict'),
+            content: const Text('You have entered data for both Expense and Income. Please clear one side before saving.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+            ],
+          )
+        );
+        return;
     }
     
     if (!_formKey.currentState!.validate()) {
@@ -370,7 +325,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
 
               return Focus(
                 onFocusChange: (hasFocus) {
-                  if (hasFocus) onFocusAction();
+                  // if (hasFocus) onFocusAction(); // Removed conflict check on focus
                 },
                 child: TextFormField(
                   controller: textEditingController,
@@ -407,7 +362,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
                 border: Border.all(color: Colors.grey.shade300),
                 image: currentIconUrl != null 
                     ? DecorationImage(
-                        image: NetworkImage(
+                        image: CachedNetworkImageProvider(
                             currentIconUrl.startsWith('http') 
                             ? currentIconUrl 
                             : '${ApiService.serverUrl}/${currentIconUrl.startsWith('/') ? currentIconUrl.substring(1) : currentIconUrl}'
@@ -460,118 +415,188 @@ class _BillFormScreenState extends State<BillFormScreen> {
               ),
               const SizedBox(height: 16),
               
-              // Payment Section
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Payment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
-                      const SizedBox(height: 16),
-                      _buildAutocompleteField(
-                        controller: _payTargetController,
-                        label: 'Pay Target',
-                        options: provider.uniquePayees,
-                        onIconPressed: () => _pickAndUploadIcon(true),
-                        onFocusAction: () => _checkConflict(isPay: true),
-                        currentIconUrl: _payeeIcon,
-                        isRequired: false, 
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _pendingAmountController,
-                        focusNode: _pendingAmountFocus,
-                        decoration: const InputDecoration(
-                          labelText: 'Pending Amount',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.attach_money),
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 8),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Is Paid?'),
-                        value: _isPaid,
-                        onChanged: (v) {
-                           _checkConflict(isPay: true);
-                           setState(() => _isPaid = v);
-                        },
-                      ),
-                      if (_isPaid)
-                        InkWell(
-                          onTap: () => _pickDate(context, isActualPaid: true),
-                          child: InputDecorator(
-                            decoration: const InputDecoration(
-                              labelText: 'Actual Paid Date',
-                              border: OutlineInputBorder(),
-                              suffixIcon: Icon(Icons.calendar_today),
+              // Mode Toggle
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _isIncomeMode = false),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: !_isIncomeMode ? Colors.blue : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: !_isIncomeMode ? [
+                              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))
+                            ] : [],
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '支出 (Expense)',
+                            style: TextStyle(
+                              color: !_isIncomeMode ? Colors.white : Colors.black54,
+                              fontWeight: FontWeight.bold,
                             ),
-                            child: Text(_actualPaidDate == null 
-                                ? 'Select Date' 
-                                : DateFormat('yyyy-MM-dd').format(_actualPaidDate!)),
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _isIncomeMode = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _isIncomeMode ? Colors.green : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: _isIncomeMode ? [
+                              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))
+                            ] : [],
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '收入 (Income)',
+                            style: TextStyle(
+                              color: _isIncomeMode ? Colors.white : Colors.black54,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-
-              const SizedBox(height: 24),
-
-              // Receivable Section
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Receivable', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
-                      const SizedBox(height: 16),
-                      _buildAutocompleteField(
-                        controller: _payerController,
-                        label: 'Payer',
-                        options: provider.uniquePayers,
-                        onIconPressed: () => _pickAndUploadIcon(false),
-                        onFocusAction: () => _checkConflict(isPay: false),
-                        currentIconUrl: _payerIcon,
-                        isRequired: false,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _pendingReceiveAmountController,
-                        focusNode: _pendingReceiveAmountFocus,
-                        decoration: const InputDecoration(
-                          labelText: 'Pending Receive Amount',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.attach_money),
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _actualReceiveAmountController,
-                        focusNode: _actualReceiveAmountFocus,
-                        decoration: const InputDecoration(
-                          labelText: 'Actual Receive Amount',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.check_circle_outline),
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
               const SizedBox(height: 24),
               
-              // Common Section
+              
+              // Payment Section
+              if (!_isIncomeMode)
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Payment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
+                        const SizedBox(height: 16),
+                        _buildAutocompleteField(
+                          controller: _payTargetController,
+                          label: 'Pay Target',
+                          options: provider.uniquePayees,
+                          onIconPressed: () => _pickAndUploadIcon(true),
+                          onFocusAction: () {},
+                          currentIconUrl: _payeeIcon,
+                          isRequired: false, 
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _pendingAmountController,
+                          focusNode: _pendingAmountFocus,
+                          decoration: const InputDecoration(
+                            labelText: 'Pending Amount',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.attach_money),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+
+                      ],
+                    ),
+                  ),
+                ),
+
+              if (!_isIncomeMode) const SizedBox(height: 24),
+
+              // Receivable Section
+              if (_isIncomeMode)
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Receivable', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+                        const SizedBox(height: 16),
+                        _buildAutocompleteField(
+                          controller: _payerController,
+                          label: 'Payer',
+                          options: provider.uniquePayers,
+                          onIconPressed: () => _pickAndUploadIcon(false),
+                          onFocusAction: () {},
+                          currentIconUrl: _payerIcon,
+                          isRequired: false,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _pendingReceiveAmountController,
+                          focusNode: _pendingReceiveAmountFocus,
+                          decoration: const InputDecoration(
+                            labelText: 'Pending Receive Amount',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.attach_money),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _actualReceiveAmountController,
+                          focusNode: _actualReceiveAmountFocus,
+                          decoration: const InputDecoration(
+                            labelText: 'Actual Receive Amount',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.check_circle_outline),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              
+              if (_isIncomeMode) const SizedBox(height: 24),
+              
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(_isIncomeMode ? '已接收' : '已支付'),
+                value: _isPaid,
+                onChanged: (v) {
+                   setState(() {
+                     _isPaid = v;
+                     if (_isPaid && _actualPaidDate == null) {
+                       _actualPaidDate = DateTime.now();
+                     }
+                   });
+                },
+              ),
+              if (_isPaid)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: InkWell(
+                    onTap: () => _pickDate(context, isActualPaid: true),
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: _isIncomeMode ? '实际到账日期' : '实际支付日期',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: const Icon(Icons.calendar_today),
+                      ),
+                      child: Text(_actualPaidDate == null 
+                          ? 'Select Date' 
+                          : DateFormat('yyyy-MM-dd').format(_actualPaidDate!)),
+                    ),
+                  ),
+                ),
+              
               TextFormField(
                 controller: _noteController,
                 decoration: const InputDecoration(
@@ -589,6 +614,9 @@ class _BillFormScreenState extends State<BillFormScreen> {
                 onChanged: (v) => setState(() => _isNextMonthSame = v),
               ),
               const SizedBox(height: 32),
+              
+
+
             ],
           ),
         ),
