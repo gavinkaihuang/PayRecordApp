@@ -1,4 +1,4 @@
-package com.example.pay_record_app
+package com.mcoc.pay_record_app
 
 import io.flutter.embedding.android.FlutterActivity
 
