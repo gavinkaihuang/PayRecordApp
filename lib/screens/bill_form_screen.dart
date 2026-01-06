@@ -38,6 +38,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
   bool _isPaid = false;
   DateTime? _actualPaidDate;
   bool _isNextMonthSame = false;
+  int _recurringInterval = 1;
   String? _payeeIcon;
   String? _payerIcon;
   
@@ -61,6 +62,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
     _isPaid = bill?.isPaid ?? false;
     _actualPaidDate = bill?.actualPaidDate;
     _isNextMonthSame = bill?.isNextMonthSame ?? false;
+    _recurringInterval = bill?.recurringInterval ?? 1;
     _payeeIcon = bill?.payeeIcon;
     _payerIcon = bill?.payerIcon;
 
@@ -254,6 +256,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
       actualReceiveAmount: double.tryParse(_actualReceiveAmountController.text),
       note: _noteController.text,
       isNextMonthSame: _isNextMonthSame,
+      recurringInterval: _recurringInterval,
       payeeIcon: _payeeIcon,
       payerIcon: _payerIcon,
     );
@@ -609,10 +612,33 @@ class _BillFormScreenState extends State<BillFormScreen> {
               const SizedBox(height: 8),
               SwitchListTile(
                  contentPadding: EdgeInsets.zero,
-                title: const Text('Is Next Month Same Amount?'),
+                title: const Text('Is Recurring Bill?'),
                 value: _isNextMonthSame,
                 onChanged: (v) => setState(() => _isNextMonthSame = v),
               ),
+              if (_isNextMonthSame)
+                Padding(
+                  padding: const EdgeInsets.only(left: 16.0, top: 4.0),
+                  child: Row(
+                    children: [
+                      const Text('Recurring Interval: '),
+                      const SizedBox(width: 8),
+                      DropdownButton<int>(
+                        value: _recurringInterval,
+                        items: const [
+                          DropdownMenuItem(value: 1, child: Text('Monthly')),
+                          DropdownMenuItem(value: 2, child: Text('Every 2 Months')),
+                          DropdownMenuItem(value: 3, child: Text('Quarterly (3 Mo)')),
+                          DropdownMenuItem(value: 6, child: Text('Every 6 Months')),
+                          DropdownMenuItem(value: 12, child: Text('Annually')),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) setState(() => _recurringInterval = v);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 32),
               
 

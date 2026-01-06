@@ -25,12 +25,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   CalendarFormat _calendarFormat = CalendarFormat.week;
+  bool _showUnpaidOnly = false;
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener = ItemPositionsListener.create();
 
   @override
   void initState() {
     super.initState();
+    if (ApiService.isDevMode) print('DashboardScreen initState called');
     _selectedDay = _focusedDay;
     // Delay fetch to avoid setState during build
     Future.microtask(() => _fetchBills());
@@ -97,7 +99,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final billProvider = Provider.of<BillProvider>(context, listen: false);
       
       if (ApiService.isDevMode) LogService().addLog('UserOp: Submitting Clone Request...');
-      await billProvider.cloneBillstToNextMonth(_focusedDay.year, _focusedDay.month);
+      
+      // Calculate next month
+      final nextMonthDate = DateTime(_focusedDay.year, _focusedDay.month + 1);
+      await billProvider.cloneBillsClientSide(nextMonthDate.year, nextMonthDate.month);
       
       // Navigate to next month to see results
       setState(() {
@@ -175,6 +180,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final billProvider = Provider.of<BillProvider>(context);
+    
+    // Filter bills if needed
+    final visibleBills = _showUnpaidOnly 
+        ? billProvider.bills.where((b) => !b.isPaid).toList()
+        : billProvider.bills;
 
     return Scaffold(
       extendBodyBehindAppBar: true, 
@@ -195,6 +205,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              _showUnpaidOnly ? Icons.filter_alt : Icons.filter_alt_off, 
+              color: _showUnpaidOnly ? Colors.blue : Colors.black54
+            ),
+            tooltip: 'Filter Unpaid',
+            onPressed: () {
+              setState(() {
+                _showUnpaidOnly = !_showUnpaidOnly;
+              });
+              if (ApiService.isDevMode) {
+                 LogService().addLog('UserOp: Toggled Unpaid Filter: $_showUnpaidOnly');
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.calendar_view_week, color: Colors.black54),
             tooltip: 'Toggle View',
@@ -308,7 +333,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               calendarBuilders: CalendarBuilders(
                 // Custom background for payment status
                 defaultBuilder: (context, date, focusedDay) {
-                  final bills = billProvider.bills.where((b) => isSameDay(b.date, date)).toList();
+                  final bills = visibleBills.where((b) => isSameDay(b.date, date)).toList();
                   if (bills.isEmpty) return null;
 
                   Color? bgColor;
@@ -353,7 +378,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 // Marker: Show number if bills exist
                 markerBuilder: (context, date, events) {
-                  final bills = billProvider.bills.where((b) => isSameDay(b.date, date)).toList();
+                  final bills = visibleBills.where((b) => isSameDay(b.date, date)).toList();
                   if (bills.isNotEmpty) {
                     final isAllPaid = bills.every((b) => b.isPaid);
                     final isAllUnpaid = bills.every((b) => !b.isPaid);
@@ -408,7 +433,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   child: billProvider.isLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : billProvider.bills.isEmpty
+                    : visibleBills.isEmpty
                         ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -425,12 +450,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         : ScrollablePositionedList.separated(
                             itemScrollController: _itemScrollController,
                             itemPositionsListener: _itemPositionsListener,
-                            itemCount: billProvider.bills.length,
+                            itemCount: visibleBills.length,
                             padding: const EdgeInsets.only(top: 16, bottom: 80), // Padding for FAB prevention
                             // separatorBuilder: (context, index) => const Divider(height: 1, thickness: 0.5, color: Color(0xFFEEEEEE)), // Removed for card style
                             separatorBuilder: (context, index) => const SizedBox(height: 0),
                             itemBuilder: (context, index) {
-                              final bill = billProvider.bills[index];
+                              final bill = visibleBills[index];
                               return BillItem(
                                 bill: bill,
                                 isSelected: isSameDay(bill.date, _selectedDay),

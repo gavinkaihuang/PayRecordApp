@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dashboard_screen.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
@@ -21,9 +22,18 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     final success = await Provider.of<AuthProvider>(context, listen: false)
         .login(_usernameController.text, _passwordController.text);
+    
+    
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (!success && mounted) {
+    if (success) {
+      if (ApiService.isDevMode) print('Login successful in UI. Attempting navigation fallback if needed...');
+      // Imperative navigation fallback
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+      );
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login failed. Please check credentials.')),
       );

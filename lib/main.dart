@@ -4,6 +4,7 @@ import 'providers/auth_provider.dart';
 import 'providers/bill_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'services/api_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -50,14 +51,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, auth, _) {
-        if (auth.isAuthenticated) {
-          return const DashboardScreen();
-        } else {
-          return const LoginScreen();
-        }
-      },
-    );
+    // Use context.watch to listen to changes
+    final auth = context.watch<AuthProvider>();
+    
+    print('AuthWrapper Rebuild. IsAuthenticated: ${auth.isAuthenticated}');
+    
+    if (auth.isAuthenticated) {
+      return const DashboardScreen();
+    } else {
+      return const LoginScreen();
+    }
   }
 }

@@ -66,26 +66,89 @@ class BillProvider with ChangeNotifier {
     return false;
   }
 
-  Future<void> cloneBillstToNextMonth(int currentYear, int currentMonth) async {
+  Future<void> cloneBillsClientSide(int targetYear, int targetMonth) async {
     _isLoading = true;
     notifyListeners();
-
     try {
       if (ApiService.isDevMode) {
-        print('====== [UserOp] Calling Backend Clone API for $currentYear-$currentMonth ======');
+        print('====== [UserOp] Running Client-Side Clone for Target: $targetYear-$targetMonth ======');
       }
-      final response = await _apiService.cloneBills(currentYear, currentMonth);
-      if (response.statusCode == 200 || response.statusCode == 201) {
-         if (ApiService.isDevMode) {
-           print('====== [UserOp] Backend Clone Successful ======');
-         }
-      } else {
-         if (ApiService.isDevMode) {
-           print('====== [UserOp] Backend Clone Failed: ${response.statusCode} ======');
-         }
+      
+      List<Bill> billsToClone = [];
+      
+      // 1. Server Side Clone for Monthly (Interval 1)
+      // The server API clones FROM the given year/month TO the next month.
+      // So if we want bills in TargetMonth, we tell server to clone from TargetMonth - 1.
+      final sourceDateForMonthly = DateTime(targetYear, targetMonth - 1, 1);
+      if (ApiService.isDevMode) {
+        print('====== [UserOp] calling Server Clone for Monthly bills from: ${sourceDateForMonthly.year}-${sourceDateForMonthly.month} ======');
       }
+      await _apiService.cloneBills(sourceDateForMonthly.year, sourceDateForMonthly.month);
+
+      // 2. Client Side Clone for Custom Intervals (Intervals > 1)
+      final intervals = [2, 3, 6, 12]; // Skip 1, server handled it
+      
+      for (final interval in intervals) {
+        // Calculate source date: target - interval months
+        // DateTime handles year rollover automatically
+        // using day 1 to avoid overflow issues during month math
+        final sourceDate = DateTime(targetYear, targetMonth - interval, 1);
+        
+        if (ApiService.isDevMode) {
+          print('Checking source: ${sourceDate.year}-${sourceDate.month} for interval $interval');
+        }
+
+        final response = await _apiService.getBills(sourceDate.year, sourceDate.month);
+        if (response.statusCode == 200) {
+           final List<dynamic> data = response.data;
+           final sourceBills = data.map((json) => Bill.fromJson(json)).toList();
+           
+           // Filter
+           final matching = sourceBills.where((b) => 
+              b.isNextMonthSame && b.recurringInterval == interval
+           ).toList();
+           
+           if (ApiService.isDevMode) {
+             print('Found ${matching.length} matching bills for interval $interval');
+           }
+           
+           billsToClone.addAll(matching);
+        }
+      }
+      
+      // Add all identified bills to target month
+      int addedCount = 0;
+      for (final b in billsToClone) {
+        // Handle day overflow (e.g., Jan 31 -> Feb 28)
+        int day = b.date.day;
+        int lastDayOfTarget = DateTime(targetYear, targetMonth + 1, 0).day;
+        if (day > lastDayOfTarget) day = lastDayOfTarget;
+
+        final newBill = Bill(
+          date: DateTime(targetYear, targetMonth, day),
+          payTarget: b.payTarget,
+          pendingAmount: b.pendingAmount,
+          isPaid: false, // Reset status
+          payer: b.payer,
+          receiver: b.receiver,
+          pendingReceiveAmount: b.pendingReceiveAmount,
+          note: b.note,
+          isNextMonthSame: true, // Keep recurring
+          recurringInterval: b.recurringInterval, // Keep interval
+          payeeIcon: b.payeeIcon,
+          payerIcon: b.payerIcon,
+        );
+        
+        bool success = await addBill(newBill);
+        if (success) addedCount++;
+      }
+      
+       if (ApiService.isDevMode) {
+         print('====== [UserOp] Client-Side Clone Complete. Added $addedCount bills. ======');
+       }
+      
     } catch (e) {
-      print('Clone error: $e');
+      print('Client-side clone error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();

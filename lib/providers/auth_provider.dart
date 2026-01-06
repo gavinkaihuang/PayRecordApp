@@ -39,13 +39,16 @@ class AuthProvider with ChangeNotifier {
              print('====== [UserOp] Login Success. Token: $token ======');
           }
           // Always save token for persistent login as requested
+          if (ApiService.isDevMode) print('Saving token to SharedPreferences...');
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('token', token);
           await prefs.setString('username', username);
+          if (ApiService.isDevMode) print('Token saved. Updating state and notifying listeners...');
 
           _user = User(username: username, token: token);
           _isAuthenticated = true;
           notifyListeners();
+          if (ApiService.isDevMode) print('Listeners notified.');
           return true;
         }
       }

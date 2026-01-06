@@ -11,6 +11,7 @@ class Bill {
   final double? actualReceiveAmount;
   final String? note; // Maps to 'notes'
   final bool isNextMonthSame; // Maps to 'isRecurring'
+  final int recurringInterval; // New field: 1=Monthly, 3=Quarterly, etc.
   final String? payeeIcon;
   final String? payerIcon;
 
@@ -27,6 +28,7 @@ class Bill {
     this.actualReceiveAmount,
     this.note,
     this.isNextMonthSame = false,
+    this.recurringInterval = 1,
     this.payeeIcon,
     this.payerIcon,
   });
@@ -45,6 +47,7 @@ class Bill {
       actualReceiveAmount: json['actualReceiveAmount']?.toDouble(),
       note: json['notes'] ?? json['note'],
       isNextMonthSame: json['isRecurring'] ?? json['isNextMonthSame'] ?? false,
+      recurringInterval: json['recurringInterval'] ?? 1,
       payeeIcon: json['payeeIcon'],
       payerIcon: json['payerIcon'],
     );
@@ -64,6 +67,7 @@ class Bill {
       'actualReceiveAmount': actualReceiveAmount,
       'notes': note,
       'isRecurring': isNextMonthSame,
+      'recurringInterval': recurringInterval,
       'payeeIcon': payeeIcon,
       'payerIcon': payerIcon,
     };
