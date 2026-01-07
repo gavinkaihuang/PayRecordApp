@@ -74,7 +74,7 @@ class BillItem extends StatelessWidget {
                           child: CachedNetworkImage(
                             imageUrl: displayIcon.startsWith('http') 
                                 ? displayIcon 
-                                : '${ApiService.serverUrl}/${displayIcon.startsWith('/') ? displayIcon.substring(1) : displayIcon}',
+                                : '${ApiService().currentServerUrl}/${displayIcon.startsWith('/') ? displayIcon.substring(1) : displayIcon}',
                             width: 50,
                             height: 50,
                             fit: BoxFit.cover,

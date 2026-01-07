@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'dashboard_screen.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import 'settings_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,14 +21,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     setState(() => _isLoading = true);
-    final success = await Provider.of<AuthProvider>(context, listen: false)
+    final errorMsg = await Provider.of<AuthProvider>(context, listen: false)
         .login(_usernameController.text, _passwordController.text);
-    
     
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (success) {
+    if (errorMsg == null) {
       if (ApiService.isDevMode) print('Login successful in UI. Attempting navigation fallback if needed...');
       // Imperative navigation fallback
       Navigator.of(context).pushReplacement(
@@ -35,7 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login failed. Please check credentials.')),
+        SnackBar(content: Text(errorMsg)),
       );
     }
   }
@@ -43,7 +43,20 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('PayRecord Login')),
+      appBar: AppBar(
+        title: const Text('PayRecord Login'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

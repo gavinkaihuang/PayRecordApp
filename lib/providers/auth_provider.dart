@@ -24,7 +24,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> login(String username, String password) async {
+  Future<String?> login(String username, String password) async {
     try {
       final response = await _apiService.login(username, password);
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -49,13 +49,17 @@ class AuthProvider with ChangeNotifier {
           _isAuthenticated = true;
           notifyListeners();
           if (ApiService.isDevMode) print('Listeners notified.');
-          return true;
+          return null; // Success implies no error message
         }
       }
     } catch (e) {
       print('Login error: $e');
+      if (e.toString().contains('Connection refused')) {
+        return 'Connection refused. Check IP/Port and ensure server is running.';
+      }
+      return 'Connection error: ${e.toString()}';
     }
-    return false;
+    return 'Invalid credentials or server error.';
   }
 
   Future<void> logout() async {

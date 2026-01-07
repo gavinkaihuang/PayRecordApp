@@ -6,13 +6,22 @@ import 'log_service.dart';
 
 class ApiService {
   late Dio _dio;
-  static const String serverUrl = 'http://192.168.0.101:3000';
-  final String baseUrl = '$serverUrl/api';
+  static final ApiService _instance = ApiService._internal();
+
+  // Default values
+  static const String defaultIp = '192.168.0.101';
+  static const String defaultPort = '3000';
+  
+  String _baseUrl = 'http://$defaultIp:$defaultPort/api';
   static bool isDevMode = true;
 
-  ApiService() {
+  factory ApiService() {
+    return _instance;
+  }
+
+  ApiService._internal() {
     _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
+      baseUrl: _baseUrl,
       connectTimeout: const Duration(seconds: 5),
       receiveTimeout: const Duration(seconds: 3),
       headers: {
@@ -25,6 +34,12 @@ class ApiService {
         if (isDevMode) {
           LogService().addLog('API Req: ${options.method} ${options.uri}');
         }
+        
+        // Ensure baseUrl is up to date (in case it changed and Dio options weren't updated)
+        // Or update Dio base url when settings change.
+        // Let's rely on init() or updateConnection settings.
+        options.baseUrl = _baseUrl; 
+
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('token');
         if (isDevMode) {
@@ -51,6 +66,37 @@ class ApiService {
         return handler.next(e);
       },
     ));
+    
+    // Initial load
+    init();
+  }
+
+  Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    final ip = prefs.getString('server_ip') ?? defaultIp;
+    final port = prefs.getString('server_port') ?? defaultPort;
+    _baseUrl = 'http://$ip:$port/api';
+    _dio.options.baseUrl = _baseUrl;
+    if (isDevMode) print('ApiService initialized with: $_baseUrl');
+  }
+
+  Future<void> updateConnection(String ip, String port) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('server_ip', ip);
+    await prefs.setString('server_port', port);
+    _baseUrl = 'http://$ip:$port/api';
+    _dio.options.baseUrl = _baseUrl;
+    if (isDevMode) print('ApiService updated to: $_baseUrl');
+  }
+
+  String get currentBaseUrl => _baseUrl;
+  
+  String get currentServerUrl {
+    // Remove '/api' from the end
+    if (_baseUrl.endsWith('/api')) {
+      return _baseUrl.substring(0, _baseUrl.length - 4);
+    }
+    return _baseUrl;
   }
 
   Future<Response> login(String username, String password) async {
@@ -84,8 +130,6 @@ class ApiService {
       });
     } catch (e) {
       if (isDevMode) print('Failed to set merchant icon: $e');
-      // Non-critical, eat error or rethrow?
-      // User flow shouldn't break if merchant save fails, but nice to know.
     }
   }
 
@@ -111,8 +155,6 @@ class ApiService {
     });
     try {
       final response = await _dio.post('/upload', data: formData);
-      // Assuming response.data['url'] or nested structure. 
-      // Adjust based on actual backend. Commonly { url: "path" }
       if (response.statusCode == 200 || response.statusCode == 201) {
         return response.data['url']; 
       }

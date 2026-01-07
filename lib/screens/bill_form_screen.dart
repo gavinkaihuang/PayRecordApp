@@ -368,7 +368,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
                         image: CachedNetworkImageProvider(
                             currentIconUrl.startsWith('http') 
                             ? currentIconUrl 
-                            : '${ApiService.serverUrl}/${currentIconUrl.startsWith('/') ? currentIconUrl.substring(1) : currentIconUrl}'
+                            : '${ApiService().currentServerUrl}/${currentIconUrl.startsWith('/') ? currentIconUrl.substring(1) : currentIconUrl}'
                         ),
                         fit: BoxFit.cover,
                       )
