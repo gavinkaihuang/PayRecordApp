@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/log_service.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -41,10 +42,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       final response = await _apiService.getProfile();
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
+        if (ApiService.isDevMode) {
+          LogService().addLog('Profile Response Keys: ${data.keys.toList()}');
+          LogService().addLog('Profile Telegram Data: ${data['telegramToken']} / ${data['telegram_token']}');
+          print('Profile Response: $data');
+        }
         _usernameController.text = data['username'] ?? '';
         _nicknameController.text = data['nickname'] ?? '';
-        _telegramTokenController.text = data['telegramToken'] ?? '';
-        _telegramChatIdController.text = data['telegramChatId'] ?? '';
+        
+        // Check for both camelCase and snake_case
+        _telegramTokenController.text = 
+            data['telegramToken'] ?? data['telegram_token'] ?? '';
+        _telegramChatIdController.text = 
+            data['telegramChatId'] ?? data['telegram_chat_id'] ?? '';
       }
     } catch (e) {
       if (ApiService.isDevMode) print('Fetch profile error: $e');

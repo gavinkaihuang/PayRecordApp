@@ -73,20 +73,50 @@ class ApiService {
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    final ip = prefs.getString('server_ip') ?? defaultIp;
-    final port = prefs.getString('server_port') ?? defaultPort;
-    _baseUrl = 'http://$ip:$port/api';
+    final type = prefs.getString('connection_type') ?? 'ip';
+    
+    if (type == 'domain') {
+      final domain = prefs.getString('server_domain') ?? '';
+      // Ensure domain has protocol (basic check)
+      String cleanDomain = domain;
+      if (domain.isNotEmpty && !domain.startsWith('http')) {
+        cleanDomain = 'https://$domain';
+      }
+      _baseUrl = '$cleanDomain/api';
+    } else {
+      final ip = prefs.getString('server_ip') ?? defaultIp;
+      final port = prefs.getString('server_port') ?? defaultPort;
+      _baseUrl = 'http://$ip:$port/api';
+    }
+    
     _dio.options.baseUrl = _baseUrl;
-    if (isDevMode) print('ApiService initialized with: $_baseUrl');
+    if (isDevMode) print('ApiService initialized with: $_baseUrl (Type: $type)');
   }
 
-  Future<void> updateConnection(String ip, String port) async {
+  Future<void> updateConnection({
+    required String type,
+    String? ip,
+    String? port,
+    String? domain,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('server_ip', ip);
-    await prefs.setString('server_port', port);
-    _baseUrl = 'http://$ip:$port/api';
+    await prefs.setString('connection_type', type);
+    
+    if (type == 'domain' && domain != null) {
+      await prefs.setString('server_domain', domain);
+      String cleanDomain = domain;
+      if (domain.isNotEmpty && !domain.startsWith('http')) {
+        cleanDomain = 'https://$domain';
+      }
+      _baseUrl = '$cleanDomain/api';
+    } else if (type == 'ip' && ip != null && port != null) {
+      await prefs.setString('server_ip', ip);
+      await prefs.setString('server_port', port);
+      _baseUrl = 'http://$ip:$port/api';
+    }
+    
     _dio.options.baseUrl = _baseUrl;
-    if (isDevMode) print('ApiService updated to: $_baseUrl');
+    if (isDevMode) print('ApiService updated to: $_baseUrl (Type: $type)');
   }
 
   String get currentBaseUrl => _baseUrl;
