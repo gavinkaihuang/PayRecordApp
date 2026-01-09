@@ -154,6 +154,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _onExitApp() async {
+    if (Platform.isIOS) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Swipe up to close app on iOS')),
+      );
+      return;
+    }
+
     final shouldExit = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

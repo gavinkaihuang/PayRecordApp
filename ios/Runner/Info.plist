@@ -34,13 +34,19 @@
 			<string>UIInterfaceOrientationLandscapeLeft</string>
 			<string>UIInterfaceOrientationLandscapeRight</string>
 		</array>
-		<key>UISupportedInterfaceOrientations~ipad</key>
+    <key>UISupportedInterfaceOrientations~ipad</key>
 		<array>
 			<string>UIInterfaceOrientationPortrait</string>
 			<string>UIInterfaceOrientationPortraitUpsideDown</string>
 			<string>UIInterfaceOrientationLandscapeLeft</string>
 			<string>UIInterfaceOrientationLandscapeRight</string>
 		</array>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Needs access to photo library to select bill images.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Needs access to camera to take bill images.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Needs access to microphone for video.</string>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>

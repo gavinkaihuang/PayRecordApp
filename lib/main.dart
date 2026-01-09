@@ -6,10 +6,31 @@ import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'services/api_service.dart';
 
+import 'dart:async';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await ApiService().init();
+  print('Flutter binding initialized.');
+  
+  try {
+    // Add small delay to allow native plugins to settle
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    // --- SAFE MODE: CLEAR DATA TO FIX CRASH ---
+    // Uncomment this if app keeps crashing on startup
+    // final prefs = await SharedPreferences.getInstance();
+    // await prefs.clear();
+    // print('!!! CLEARED ALL PREFS FOR DEBUGGING !!!');
+    // -------------------------------------------
+
+    await ApiService().init();
+    print('ApiService initialized.');
+  } catch (e, stack) {
+    print('ApiService init error: $e\n$stack');
+  }
+
   runApp(const MyApp());
+  print('runApp called.');
 }
 
 class MyApp extends StatelessWidget {
