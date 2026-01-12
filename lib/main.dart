@@ -70,6 +70,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     Future.microtask(() => 
       Provider.of<AuthProvider>(context, listen: false).checkLoginStatus()
     );
+    print('AuthWrapper initialized');
   }
 
   @override

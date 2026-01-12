@@ -53,5 +53,11 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>NSLocalNetworkUsageDescription</key>
+		<string>Allow local network access for debugging and service discovery.</string>
+		<key>NSBonjourServices</key>
+		<array>
+			<string>_dartobservatory._tcp</string>
+		</array>
 	</dict>
 </plist>
