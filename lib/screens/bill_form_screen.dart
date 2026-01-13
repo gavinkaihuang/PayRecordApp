@@ -300,6 +300,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
     required List<String> options,
     required VoidCallback onIconPressed,
     required Function() onFocusAction,
+    Function(String)? onSuggestionSelected, // New callback
     String? currentIconUrl,
     bool isRequired = false,
   }) {
@@ -311,7 +312,7 @@ class _BillFormScreenState extends State<BillFormScreen> {
             initialValue: TextEditingValue(text: controller.text),
             optionsBuilder: (TextEditingValue textEditingValue) {
               if (textEditingValue.text == '') {
-                return const Iterable<String>.empty();
+                return options;
               }
               return options.where((String option) {
                 return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
@@ -319,34 +320,56 @@ class _BillFormScreenState extends State<BillFormScreen> {
             },
             onSelected: (String selection) {
               controller.text = selection;
+              if (onSuggestionSelected != null) {
+                onSuggestionSelected(selection);
+              }
             },
             fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-              if (controller.text != textEditingController.text) {
-                textEditingController.text = controller.text;
-                textEditingController.selection = TextSelection.fromPosition(TextPosition(offset: controller.text.length));
+              // Sync controller if external change happens (rare but possible with form reset)
+              if (controller.text != textEditingController.text && 
+                  controller.text.isNotEmpty && 
+                  textEditingController.text.isEmpty) {
+                 // specific case: only sync if internal is empty but external has value (initial load handled by initialValue)
+                 // But actually, bidirectional sync is tricky with Autocomplete.
+                 // Let's stick to the previous pattern but be careful.
+                  textEditingController.text = controller.text;
+                  textEditingController.selection = TextSelection.fromPosition(TextPosition(offset: controller.text.length));
               }
+              
+              // Ensure we listen to text changes to update parent controller
+              // The previous code did this in onChanged of TextFormField.
 
-              return Focus(
-                onFocusChange: (hasFocus) {
-                  // if (hasFocus) onFocusAction(); // Removed conflict check on focus
-                },
-                child: TextFormField(
-                  controller: textEditingController,
-                  focusNode: focusNode,
-                  decoration: InputDecoration(
-                    labelText: label,
-                    border: const OutlineInputBorder(),
+              return TextFormField(
+                controller: textEditingController,
+                focusNode: focusNode,
+                decoration: InputDecoration(
+                  labelText: label,
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.arrow_drop_down),
+                    onPressed: () {
+                      // Trigger options by requesting focus or refreshing
+                      if (!focusNode.hasFocus) {
+                        focusNode.requestFocus();
+                      } else {
+                        // If already focused, toggling isn't natively supported by simple Autocomplete
+                        // But usually users click this to "open" it. Focus does that if we enable empty options.
+                        // To force refresh, we might need a hack, but let's try simple focus first.
+                        // Setting text to itself triggers build?
+                        textEditingController.text = textEditingController.text; 
+                      }
+                    },
                   ),
-                  validator: (v) {
-                    if (isRequired && (v == null || v.isEmpty)) {
-                        // If we are in conflict mode, maybe validation should be relaxed?
-                        // For now stick to standard Validator
-                       return 'Please enter value';
-                    }
-                    return null;
-                  },
-                  onChanged: (val) => controller.text = val,
                 ),
+                validator: (v) {
+                  if (isRequired && (v == null || v.isEmpty)) {
+                     return 'Please enter value';
+                  }
+                  return null;
+                },
+                onChanged: (val) {
+                  controller.text = val;
+                },
               );
             },
           ),
@@ -497,6 +520,12 @@ class _BillFormScreenState extends State<BillFormScreen> {
                           options: provider.uniquePayees,
                           onIconPressed: () => _pickAndUploadIcon(true),
                           onFocusAction: () {},
+                          onSuggestionSelected: (val) {
+                             final icon = provider.getMostRecentPayeeIcon(val);
+                             if (icon != null) {
+                               setState(() => _payeeIcon = icon);
+                             }
+                          },
                           currentIconUrl: _payeeIcon,
                           isRequired: false, 
                         ),
@@ -537,6 +566,12 @@ class _BillFormScreenState extends State<BillFormScreen> {
                           options: provider.uniquePayers,
                           onIconPressed: () => _pickAndUploadIcon(false),
                           onFocusAction: () {},
+                          onSuggestionSelected: (val) {
+                             final icon = provider.getMostRecentPayerIcon(val);
+                             if (icon != null) {
+                               setState(() => _payerIcon = icon);
+                             }
+                          },
                           currentIconUrl: _payerIcon,
                           isRequired: false,
                         ),

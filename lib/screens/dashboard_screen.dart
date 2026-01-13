@@ -13,6 +13,7 @@ import '../services/api_service.dart';
 import 'bill_form_screen.dart';
 import 'settings_screen.dart';
 import '../services/log_service.dart';
+import '../widgets/monthly_statistics_widget.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -26,6 +27,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DateTime? _selectedDay;
   CalendarFormat _calendarFormat = CalendarFormat.week;
   bool _showUnpaidOnly = false;
+  bool _showStats = false; // Toggle state for Calendar vs Stats
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener = ItemPositionsListener.create();
 
@@ -300,130 +302,172 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
-
-            TableCalendar(
-              firstDay: DateTime.utc(2020, 1, 1),
-              lastDay: DateTime.utc(2030, 12, 31),
-              focusedDay: _focusedDay,
-              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              onDaySelected: _onDaySelected,
-              onPageChanged: (focusedDay) {
-                _focusedDay = focusedDay;
-                _fetchBills();
-              },
-              calendarFormat: _calendarFormat,
-              onFormatChanged: (format) {
-                setState(() {
-                  _calendarFormat = format;
-                });
-              },
-              headerVisible: false, // We use custom AppBar title
-              calendarStyle: const CalendarStyle(
-                outsideDaysVisible: false,
-                defaultTextStyle: TextStyle(color: Colors.black87),
-                weekendTextStyle: TextStyle(color: Colors.black87),
-                selectedDecoration: BoxDecoration(
-                  color: Color(0xFFD6E4FF), // Light blue selection circle
-                  shape: BoxShape.circle,
+            
+            // Toggle for View Mode (Calendar vs Overview)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 50.0, vertical: 8.0),
+              child: Container(
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(18),
                 ),
-                selectedTextStyle: TextStyle(color: Color(0xFF2B5CFF), fontWeight: FontWeight.bold),
-                todayDecoration: BoxDecoration(
-                  color: Colors.transparent, 
-                  shape: BoxShape.circle,
-                  border: Border.fromBorderSide(BorderSide(color: Colors.blue, width: 1)),
+                child: Row(
+                  children: [
+                    _buildToggleOption(
+                      title: 'Calendar', 
+                      isSelected: !_showStats,
+                      onTap: () {
+                         if (_showStats) {
+                           setState(() => _showStats = false);
+                           if (ApiService.isDevMode) LogService().addLog('UserOp: Switched to Calendar View');
+                         }
+                      }
+                    ),
+                    _buildToggleOption(
+                      title: 'Overview', 
+                      isSelected: _showStats,
+                      onTap: () {
+                        if (!_showStats) {
+                          setState(() => _showStats = true);
+                          if (ApiService.isDevMode) LogService().addLog('UserOp: Switched to Stats View');
+                        }
+                      }
+                    ),
+                  ],
                 ),
-                todayTextStyle: TextStyle(color: Colors.blue),
               ),
-              daysOfWeekStyle: const DaysOfWeekStyle(
-                weekdayStyle: TextStyle(color: Colors.black54),
-                weekendStyle: TextStyle(color: Colors.black54),
-              ),
-              calendarBuilders: CalendarBuilders(
-                // Custom background for payment status
-                defaultBuilder: (context, date, focusedDay) {
-                  final bills = visibleBills.where((b) => isSameDay(b.date, date)).toList();
-                  if (bills.isEmpty) return null;
+            ),
 
-                  Color? bgColor;
-                  if (bills.every((b) => b.isPaid)) {
-                    bgColor = const Color(0xFFE8F5E9); // Green tint for all paid
-                  } else if (bills.every((b) => !b.isPaid)) {
-                    bgColor = const Color(0xFFFFEBEE); // Red tint for all unpaid
-                  } else {
-                    bgColor = const Color(0xFFFFFDE7); // Yellow tint for mixed
-                  }
-
-                  return Container(
-                    margin: const EdgeInsets.all(4.0),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: bgColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '${date.day}',
-                      style: const TextStyle(color: Colors.black87),
-                    ),
-                  );
+            if (_showStats)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: MonthlyStatisticsWidget(bills: visibleBills),
+              )
+            else
+              TableCalendar(
+                firstDay: DateTime.utc(2020, 1, 1),
+                lastDay: DateTime.utc(2030, 12, 31),
+                focusedDay: _focusedDay,
+                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                onDaySelected: _onDaySelected,
+                onPageChanged: (focusedDay) {
+                  _focusedDay = focusedDay;
+                  _fetchBills();
                 },
-                
-                // Keep selected day distinctive but maybe hint at status? 
-                // For now, standard selection blue circle as per previous design compliance
-                selectedBuilder: (context, date, focusedDay) {
-                  return Container(
-                    margin: const EdgeInsets.all(4.0),
-                    alignment: Alignment.center,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFD6E4FF), 
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '${date.day}',
-                      style: const TextStyle(color: Color(0xFF2B5CFF), fontWeight: FontWeight.bold),
-                    ),
-                  );
+                calendarFormat: _calendarFormat,
+                onFormatChanged: (format) {
+                  setState(() {
+                    _calendarFormat = format;
+                  });
                 },
+                headerVisible: false, // We use custom AppBar title
+                calendarStyle: const CalendarStyle(
+                  outsideDaysVisible: false,
+                  defaultTextStyle: TextStyle(color: Colors.black87),
+                  weekendTextStyle: TextStyle(color: Colors.black87),
+                  selectedDecoration: BoxDecoration(
+                    color: Color(0xFFD6E4FF), // Light blue selection circle
+                    shape: BoxShape.circle,
+                  ),
+                  selectedTextStyle: TextStyle(color: Color(0xFF2B5CFF), fontWeight: FontWeight.bold),
+                  todayDecoration: BoxDecoration(
+                    color: Colors.transparent, 
+                    shape: BoxShape.circle,
+                    border: Border.fromBorderSide(BorderSide(color: Colors.blue, width: 1)),
+                  ),
+                  todayTextStyle: TextStyle(color: Colors.blue),
+                ),
+                daysOfWeekStyle: const DaysOfWeekStyle(
+                  weekdayStyle: TextStyle(color: Colors.black54),
+                  weekendStyle: TextStyle(color: Colors.black54),
+                ),
+                calendarBuilders: CalendarBuilders(
+                  // Custom background for payment status
+                  defaultBuilder: (context, date, focusedDay) {
+                    final bills = visibleBills.where((b) => isSameDay(b.date, date)).toList();
+                    if (bills.isEmpty) return null;
 
-                // Marker: Show number if bills exist
-                markerBuilder: (context, date, events) {
-                  final bills = visibleBills.where((b) => isSameDay(b.date, date)).toList();
-                  if (bills.isNotEmpty) {
-                    final isAllPaid = bills.every((b) => b.isPaid);
-                    final isAllUnpaid = bills.every((b) => !b.isPaid);
-                    
-                    // Use a more legible marker count
-                    return Positioned(
-                      right: 1,
-                      bottom: 1,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          // Marker color logic: 
-                          // If background is colored, maybe use contrasting marker?
-                          // Let's stick to Blue for standard, or match status?
-                          // User requested "change dot to number". 
-                          // I'll use a small badge.
-                          color: isAllPaid ? Colors.green : (isAllUnpaid ? Colors.red : Colors.orange),
-                          shape: BoxShape.circle,
-                        ),
-                        width: 14.0,
-                        height: 14.0,
-                        child: Center(
-                          child: Text(
-                            '${bills.length}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9.0,
-                              fontWeight: FontWeight.bold,
+                    Color? bgColor;
+                    if (bills.every((b) => b.isPaid)) {
+                      bgColor = const Color(0xFFE8F5E9); // Green tint for all paid
+                    } else if (bills.every((b) => !b.isPaid)) {
+                      bgColor = const Color(0xFFFFEBEE); // Red tint for all unpaid
+                    } else {
+                      bgColor = const Color(0xFFFFFDE7); // Yellow tint for mixed
+                    }
+
+                    return Container(
+                      margin: const EdgeInsets.all(4.0),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: bgColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '${date.day}',
+                        style: const TextStyle(color: Colors.black87),
+                      ),
+                    );
+                  },
+                  
+                  // Keep selected day distinctive but maybe hint at status? 
+                  // For now, standard selection blue circle as per previous design compliance
+                  selectedBuilder: (context, date, focusedDay) {
+                    return Container(
+                      margin: const EdgeInsets.all(4.0),
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFD6E4FF), 
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '${date.day}',
+                        style: const TextStyle(color: Color(0xFF2B5CFF), fontWeight: FontWeight.bold),
+                      ),
+                    );
+                  },
+
+                  // Marker: Show number if bills exist
+                  markerBuilder: (context, date, events) {
+                    final bills = visibleBills.where((b) => isSameDay(b.date, date)).toList();
+                    if (bills.isNotEmpty) {
+                      final isAllPaid = bills.every((b) => b.isPaid);
+                      final isAllUnpaid = bills.every((b) => !b.isPaid);
+                      
+                      // Use a more legible marker count
+                      return Positioned(
+                        right: 1,
+                        bottom: 1,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            // Marker color logic: 
+                            // If background is colored, maybe use contrasting marker?
+                            // Let's stick to Blue for standard, or match status?
+                            // User requested "change dot to number". 
+                            // I'll use a small badge.
+                            color: isAllPaid ? Colors.green : (isAllUnpaid ? Colors.red : Colors.orange),
+                            shape: BoxShape.circle,
+                          ),
+                          width: 14.0,
+                          height: 14.0,
+                          child: Center(
+                            child: Text(
+                              '${bills.length}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9.0,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  }
-                  return null;
-                },
+                      );
+                    }
+                    return null;
+                  },
+                ),
               ),
-            ),
             const SizedBox(height: 16),
             Expanded(
               child: Container(
@@ -552,6 +596,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggleOption({
+    required String title, 
+    required bool isSelected, 
+    required VoidCallback onTap
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF5B8CFF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            title,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.black54,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
         ),
       ),
     );

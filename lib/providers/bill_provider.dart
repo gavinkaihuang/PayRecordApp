@@ -154,4 +154,23 @@ class BillProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+
+  String? getMostRecentPayeeIcon(String name) {
+    try {
+      final match = _bills.firstWhere((b) => b.payTarget == name && b.payeeIcon != null && b.payeeIcon!.isNotEmpty);
+      return match.payeeIcon;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  String? getMostRecentPayerIcon(String name) {
+    try {
+      final match = _bills.firstWhere((b) => b.payer == name && b.payerIcon != null && b.payerIcon!.isNotEmpty);
+      return match.payerIcon;
+    } catch (e) {
+      return null;
+    }
+  }
 }
